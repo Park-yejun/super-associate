@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase와 Cloud Run 연결 테스트</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+        button { font-size: 16px; padding: 10px 20px; cursor: pointer; }
+        #message { margin-top: 20px; font-size: 18px; color: #2c3e50; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Firebase & Cloud Run 연동 테스트</h1>
+    <p>아래 버튼을 누르면 Cloud Run 백엔드에 요청을 보냅니다.</p>
+
+    <button id="callApiButton">백엔드에 메시지 요청하기</button>
+
+    <div id="message">서버 응답을 기다리는 중...</div>
+
+    <script>
+        // 사용자님의 Cloud Run 엔드포인트 URL로 수정되었습니다.
+        const BACKEND_URL = "https://super-associate-784691809804.asia-northeast3.run.app";
+
+        const messageDiv = document.getElementById('message');
+        const apiButton = document.getElementById('callApiButton');
+
+        apiButton.addEventListener('click', async () => {
+            messageDiv.textContent = '백엔드에 요청 중...';
+            try {
+                // 백엔드의 /api/message 엔드포인트에 GET 요청을 보냅니다.
+                const response = await fetch(BACKEND_URL + '/api/message');
+                
+                if (!response.ok) {
+                    throw new Error(`서버 에러: ${response.status}`);
+                }
+
+                const data = await response.json(); // 응답을 JSON 형태로 변환
+                messageDiv.textContent = data.message; // 받은 메시지를 화면에 표시
+                messageDiv.style.color = '#27ae60'; // 성공 시 초록색으로 변경
+
+            } catch (error) {
+                console.error('API 호출 중 에러 발생:', error);
+                messageDiv.textContent = '백엔드 연결에 실패했습니다. URL을 확인해주세요.';
+                messageDiv.style.color = '#c0392b'; // 실패 시 빨간색으로 변경
+            }
+        });
+    </script>
+
+</body>
+</html>
