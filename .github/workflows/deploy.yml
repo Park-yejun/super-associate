@@ -1,0 +1,28 @@
+# 워크플로의 이름
+name: Deploy to Firebase Hosting with Service Account
+
+# 언제 이 워크플로를 실행할지 지정
+on:
+  push:
+    branches:
+      - main  # 'main' 브랜치에 코드가 푸시될 때만 실행
+
+# 어떤 작업을 수행할지 지정
+jobs:
+  build_and_deploy:
+    # 어떤 환경에서 실행할지 (최신 우분투)
+    runs-on: ubuntu-latest
+    steps:
+      # 1. GitHub 저장소의 코드를 작업 공간으로 가져옴
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Firebase CLI 설치 및 배포
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          # [수정된 부분] Firebase 토큰 대신 서비스 계정 키를 사용합니다.
+          firebaseServiceAccount: '${{ secrets.GCP_SA_KEY }}' # 2단계에서 등록한 GCP_SA_KEY 사용
+          channelId: live
+          projectId: super-associate # 본인의 Firebase 프로젝트 ID
