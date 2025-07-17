@@ -7,7 +7,7 @@ on:
     branches:
       - main  # 'main' 브랜치에 코드가 푸시될 때만 실행
 
-# 어떤 작업을 수행할지 지정
+# 어떤 작업을 수행할지 지정.
 jobs:
   build_and_deploy:
     # 어떤 환경에서 실행할지 (최신 우분투)
