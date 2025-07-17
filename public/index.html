@@ -3,50 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase와 Cloud Run 연결 테스트</title>
+    <title>사용자 카드 로그인</title>
     <style>
-        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-        button { font-size: 16px; padding: 10px 20px; cursor: pointer; }
-        #message { margin-top: 20px; font-size: 18px; color: #2c3e50; font-weight: bold; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f0f2f5; }
+        .container { text-align: center; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; }
+        .popup-content { background-color: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .popup-content h2 { margin-top: 0; }
     </style>
 </head>
 <body>
 
-    <h1>Firebase & Cloud Run 연동 테스트</h1>
-    <p>아래 버튼을 누르면 Cloud Run 백엔드에 요청을 보냅니다.</p>
+    <div class="container">
+        <h1>사용자 정보를 확인 중입니다...</h1>
+        <div class="loader"></div>
+    </div>
 
-    <button id="callApiButton">백엔드에 메시지 요청하기</button>
+    <!-- 팝업들을 미리 만들어 둡니다 -->
+    <div id="popup-0" class="popup-overlay"><div class="popup-content"><h2>알림</h2><p>유효하지 않은 사용자 카드입니다.<br>ID를 확인해주세요.</p></div></div>
+    <div id="popup-1" class="popup-overlay"><div class="popup-content"><h2>1번 팝업</h2><p>환영합니다! 1번 사용자님.</p></div></div>
+    <div id="popup-2" class="popup-overlay"><div class="popup-content"><h2>2번 팝업</h2><p>안녕하세요, 2번 사용자님.</p></div></div>
+    <div id="popup-3" class="popup-overlay"><div class="popup-content"><h2>3번 팝업</h2><p>3번 사용자님, 반갑습니다.</p></div></div>
+    <div id="popup-4" class="popup-overlay"><div class="popup-content"><h2>4번 팝업</h2><p>오늘도 좋은 하루 되세요, 4번 사용자님.</p></div></div>
+    <div id="popup-5" class="popup-overlay"><div class="popup-content"><h2>5번 팝업</h2><p>5번 사용자님, 접속을 환영합니다.</p></div></div>
+    <div id="popup-error" class="popup-overlay"><div class="popup-content"><h2>오류</h2><p>데이터 처리 중 오류가 발생했습니다.<br>관리자에게 문의하세요.</p></div></div>
 
-    <div id="message">서버 응답을 기다리는 중...</div>
 
     <script>
-        // 사용자님의 Cloud Run 엔드포인트 URL로 수정되었습니다.
+        // 백엔드 Cloud Run URL
         const BACKEND_URL = "https://super-associate-784691809804.asia-northeast3.run.app";
 
-        const messageDiv = document.getElementById('message');
-        const apiButton = document.getElementById('callApiButton');
+        // 페이지가 로드되면 바로 실행
+        window.onload = async () => {
+            // 1. URL에서 id 파라미터 값 추출
+            const params = new URLSearchParams(window.location.search);
+            const userId = params.get('id');
 
-        apiButton.addEventListener('click', async () => {
-            messageDiv.textContent = '백엔드에 요청 중...';
-            try {
-                // 백엔드의 /api/message 엔드포인트에 GET 요청을 보냅니다.
-                const response = await fetch(BACKEND_URL + '/api/message');
-                
-                if (!response.ok) {
-                    throw new Error(`서버 에러: ${response.status}`);
-                }
-
-                const data = await response.json(); // 응답을 JSON 형태로 변환
-                messageDiv.textContent = data.message; // 받은 메시지를 화면에 표시
-                messageDiv.style.color = '#27ae60'; // 성공 시 초록색으로 변경
-
-            } catch (error) {
-                console.error('API 호출 중 에러 발생:', error);
-                messageDiv.textContent = '백엔드 연결에 실패했습니다. URL을 확인해주세요.';
-                messageDiv.style.color = '#c0392b'; // 실패 시 빨간색으로 변경.
+            if (!userId) {
+                showPopup('popup-0'); // id 파라미터가 없으면 0번 팝업
+                return;
             }
-        });
-    </script>
 
+            // 2. 백엔드에 ID를 보내고 결과 요청
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/verify-card?id=${userId}`);
+                const data = await response.json();
+
+                // 3. 백엔드 응답에 따라 팝업 표시
+                if (data.status === 'success') {
+                    const popupNumber = data.popup_type;
+                    showPopup(`popup-${popupNumber}`);
+                } else {
+                    // 'not_found' 또는 다른 에러 상태
+                    showPopup('popup-0');
+                }
+            } catch (error) {
+                console.error("Error verifying card:", error);
+                showPopup('popup-error');
+            }
+        };
+
+        function showPopup(popupId) {
+            const popup = document.getElementById(popupId);
+            if (popup) {
+                const mainContainer = document.querySelector('.container');
+                if(mainContainer) mainContainer.style.display = 'none'; // 로딩 화면 숨기기
+                popup.style.display = 'flex';
+            } else {
+                // 해당하는 팝업 ID가 없을 경우 (예: popup-6)
+                const errorPopup = document.getElementById('popup-error');
+                if(errorPopup) errorPopup.style.display = 'flex';
+            }
+        }
+    </script>
 </body>
 </html>
