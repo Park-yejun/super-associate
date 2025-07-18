@@ -13,7 +13,7 @@ from reportlab.lib.pagesizes import letter
 app = Flask(__name__)
 
 # --- [수정] CORS 설정 강화 ---
-# 특정 출처(프론트엔드 주소)를 명시적으로 허용하여 보안을 강화하고 문제를 해결합니다.
+# 특정 출처(프론트엔드 주소)를 명시적으로 허용하여 보안을 강화하고 문제를 해결합니다..
 CORS(
     app,
     origins=["https://super-associate.web.app"], # 이 주소에서의 요청만 허용
