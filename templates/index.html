@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Firestore 데이터 저장 테스트</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 2em auto; padding: 1em; line-height: 1.6; }
+        .form-container { display: flex; gap: 10px; margin-bottom: 2em; }
+        input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 15px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; }
+        ul { list-style-type: none; padding: 0; }
+        li { background-color: #f4f4f4; border: 1px solid #ddd; padding: 10px; margin-bottom: 8px; border-radius: 4px; }
+        #status { margin-top: 1em; font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Firestore 데이터 저장</h1>
+    <p>아래 입력창에 텍스트를 입력하고 '저장' 버튼을 누르세요.</p>
+
+    <div id="form-container" class="form-container">
+        <input type="text" id="data-input" placeholder="저장할 내용 입력...">
+        <button onclick="saveData()">저장</button>
+    </div>
+    
+    <div id="status"></div>
+
+    <h2>저장된 목록 (최신순)</h2>
+    <ul>
+        {% for entry in entries %}
+            <li>{{ entry.text }} <br><small style="color: #666;">- {{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') if entry.timestamp else '방금 전' }}</small></li>
+        {% else %}
+            <li>아직 저장된 데이터가 없습니다.</li>
+        {% endfor %}
+    </ul>
+
+    <script>
+        async function saveData() {
+            const input = document.getElementById('data-input');
+            const statusDiv = document.getElementById('status');
+            const text = input.value.trim();
+
+            if (!text) {
+                alert('저장할 내용을 입력해주세요.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/add-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusDiv.textContent = result.message;
+                    statusDiv.className = 'success';
+                    input.value = ''; // 입력창 비우기
+                    // 1초 후 페이지를 새로고침하여 목록을 갱신
+                    setTimeout(() => location.reload(), 1000); 
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                statusDiv.textContent = '오류 발생: ' + error.message;
+                statusDiv.className = 'error';
+            }
+        }
+    </script>
+</body>
+</html>
