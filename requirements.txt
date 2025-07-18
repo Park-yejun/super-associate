@@ -1,5 +1,2 @@
 Flask
-Flask-Cors
-gunicorn
-google-cloud-firestore
-reportlab
+firebase-admin
