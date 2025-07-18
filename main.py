@@ -9,11 +9,20 @@ from flask_cors import CORS
 from google.cloud import firestore
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-# (Note: For custom Korean fonts, you'd need to include the .ttf file and register it)
 
 app = Flask(__name__)
-# CORS 헤더를 설정하여 프론트엔드가 커스텀 헤더를 읽을 수 있도록 허용
-CORS(app, expose_headers='X-User-ID')
+
+# --- [수정] CORS 설정 강화 ---
+# 특정 출처(프론트엔드 주소)를 명시적으로 허용하여 보안을 강화하고 문제를 해결합니다.
+CORS(
+    app,
+    origins=["https://super-associate.web.app"], # 이 주소에서의 요청만 허용
+    methods=["POST", "GET", "OPTIONS"],      # 허용할 HTTP 메소드
+    allow_headers=["Content-Type"],          # 허용할 헤더
+    expose_headers=["X-User-ID"]             # 프론트엔드가 읽을 수 있도록 허용할 커스텀 헤더
+)
+# -----------------------------
+
 
 # --- Initialize Firestore Client ---
 db = firestore.Client()
@@ -39,7 +48,6 @@ def register_and_download_card():
         email_part = email.split('@')[0][:5]
         unique_id = f"C{timestamp_for_id}-{email_part}"
 
-        # 'users' 컬렉션에 문서를 저장합니다.
         user_doc_ref = db.collection('users').document(unique_id)
         user_doc_ref.set({
             'name': name,
@@ -54,7 +62,6 @@ def register_and_download_card():
         p = canvas.Canvas(buffer, pagesize=letter)
         width, height = letter
 
-        # (한글 폰트가 없으므로 일단 영문으로 작성, 추후 한글 폰트 파일 추가 필요)
         p.drawString(100, height - 100, "Super Associate - Digital User Card")
         p.drawString(100, height - 150, f"Name: {name}")
         p.drawString(100, height - 170, f"Email: {email}")
@@ -62,7 +69,7 @@ def register_and_download_card():
         
         link_url = f"https://super-associate.web.app?id={unique_id}"
         p.linkURL(link_url, (95, height - 255, 205, height - 225), relative=1)
-        p.setFillColorRGB(0, 0, 1) # 링크를 파란색으로
+        p.setFillColorRGB(0, 0, 1)
         p.drawString(100, height - 240, "Click here to START")
         
         p.showPage()
@@ -77,7 +84,6 @@ def register_and_download_card():
             download_name=f'SA_User_Card_{unique_id}.pdf',
             mimetype='application/pdf'
         ))
-        # 프론트엔드가 파일명을 만들 수 있도록 커스텀 헤더에 ID를 추가
         response.headers['X-User-ID'] = unique_id
         return response
 
