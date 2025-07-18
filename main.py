@@ -3,37 +3,45 @@ from flask_cors import CORS
 import gspread
 from google.oauth2.service_account import Credentials
 import os
+import json
 
 app = Flask(__name__)
 CORS(app)
 
 # --- Google Sheets API 설정 ---
-# Google Cloud 서비스 계정 키를 사용하기 위한 설정
-# GitHub Actions Secret에 GCP_SA_KEY를 등록해야 함
-# 로컬 테스트 시에는 'your-service-account-file.json' 파일을 사용
-try:
-    # Cloud Run 환경 (환경 변수에서 키 읽기)
-    # 이 부분은 실제 서비스 계정 키(JSON 내용 전체)를 환경 변수로 설정해야 함
-    # Cloud Run 배포 설정의 '변수' 탭에서 설정 가능
-    import json
-    keyfile_dict = json.loads(os.environ.get('GCP_SA_KEY_JSON'))
-    creds = Credentials.from_service_account_info(keyfile_dict)
-except:
-    # 로컬 테스트 환경 (파일에서 키 읽기)
-    # creds = Credentials.from_service_account_file('your-local-key.json')
-    # 지금은 간단하게 예외 처리
-    creds = None
-    print("Warning: Service account key not found. Google Sheets API will not work.")
+creds = None
+gc = None
 
-# gspread 클라이언트 초기화
-if creds:
+try:
+    # 1. 환경 변수에서 서비스 계정 키(JSON 문자열)를 읽어옵니다.
+    key_json_str = os.environ['GCP_SA_KEY_JSON'] # .get() 대신 []를 사용해 키가 없으면 바로 에러 발생
+    
+    # 2. JSON 문자열을 파이썬 딕셔너리로 변환합니다.
+    keyfile_dict = json.loads(key_json_str)
+    
+    # 3. 자격 증명을 생성합니다.
+    creds = Credentials.from_service_account_info(keyfile_dict)
+    
+    # 4. gspread 클라이언트를 초기화합니다.
     gc = gspread.authorize(creds)
+
+# [진단 기능 1] 환경 변수 자체가 없을 때의 에러 처리
+except KeyError:
+    print("ERROR: 환경 변수 'GCP_SA_KEY_JSON'을 찾을 수 없습니다.")
+
+# [진단 기능 2] 환경 변수 값(JSON)이 잘못되었을 때의 에러 처리
+except json.JSONDecodeError:
+    print("ERROR: 'GCP_SA_KEY_JSON' 환경 변수의 JSON 형식이 잘못되었습니다.")
+
+# [진단 기능 3] 그 외 모든 예외 처리
+except Exception as e:
+    print(f"ERROR: gspread 초기화 중 알 수 없는 에러 발생: {e}")
+
 # -----------------------------
 
 # 구글 시트 정보
 SPREADSHEET_ID = '1F4rZbcBiuM9MDoFyfHnXVIFJ7GX99lUmaZZL_i3WZ40'
 SHEET_NAME = '시트1'
-
 
 @app.route('/api/verify-card')
 def verify_card():
@@ -41,43 +49,42 @@ def verify_card():
     if not user_id:
         return jsonify({"status": "error", "message": "ID is required"}), 400
 
+    # gspread 클라이언트가 성공적으로 초기화되었는지 확인
     if not gc:
-        return jsonify({"status": "error", "message": "Google Sheets API not configured"}), 500
+        # 초기화 실패 시, 구체적인 에러 메시지 반환
+        return jsonify({"status": "error", "message": "서버 설정 오류: Google Sheets API에 연결할 수 없습니다. 관리자에게 문의하세요."}), 500
 
     try:
-        # 구글 시트 열기
         spreadsheet = gc.open_by_key(SPREADSHEET_ID)
         worksheet = spreadsheet.worksheet(SHEET_NAME)
 
-        # E열(ID)과 G열(팝업 타입)의 모든 데이터 가져오기
-        id_column_values = worksheet.col_values(5)  # E열은 5번째 열
-        popup_type_values = worksheet.col_values(7) # G열은 7번째 열
+        id_column_values = worksheet.col_values(5)
+        popup_type_values = worksheet.col_values(7)
 
-        # ID 검색
         try:
             index = id_column_values.index(user_id)
             popup_type_str = popup_type_values[index]
             
-            # G열의 값이 1~5 사이의 숫자인지 확인
             if popup_type_str.isdigit() and 1 <= int(popup_type_str) <= 5:
                 return jsonify({"status": "success", "popup_type": int(popup_type_str)})
             else:
-                # 1~5가 아닌 다른 값이면 에러 팝업을 위한 타입 반환
                 return jsonify({"status": "success", "popup_type": "error"})
 
         except ValueError:
-            # ID를 찾지 못한 경우
             return jsonify({"status": "not_found"}), 404
 
+    # [진단 기능 4] 구글 시트 API 호출 중 발생하는 모든 에러 처리
+    except gspread.exceptions.APIError as e:
+        print(f"Google Sheets API Error: {e}")
+        # API 에러(권한 부족 등) 발생 시 구체적인 메시지 반환
+        return jsonify({"status": "error", "message": f"Google Sheets API 오류: {e.response.json()['error']['message']}"}), 500
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred during sheet processing: {e}")
         return jsonify({"status": "error", "message": "An internal error occurred"}), 500
-
 
 @app.route('/')
 def index():
     return "Card Verification Backend is running."
-
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
